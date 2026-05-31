@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enigma Machine Simulator - M3/M4</title>
+<style>
+    :root {
+        --metal: #2c2f33;
+        --metal-light: #3a3e44;
+        --brass: #b5a642;
+        --lamp-off: #1a1a1a;
+        --lamp-on: #ffdd57;
+        --lamp-glow: #ffa500;
+    }
+    
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Helvetica Neue', Arial, sans-serif;
+        background: #0f0f0f;
+        background-image: 
+            radial-gradient(circle at 20% 50%, #1a1a1a 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, #1a1a1a 0%, transparent 50%);
+        min-height: 100vh;
+        color: #e0e0e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+    
+    .mono {
+        font-family: 'Courier New', 'Lucida Console', Monaco, monospace;
+    }
+    
+    .enigma-case {
+        background: linear-gradient(145deg, var(--metal), #1e2124);
+        box-shadow: 
+            0 20px 60px rgba(0,0,0,0.8),
+            inset 0 1px 0 rgba(255,255,255,0.1),
+            inset 0 -1px 0 rgba(0,0,0,0.5);
+        border: 2px solid #1a1a1a;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        width: 100%;
+        max-width: 1280px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .rotor {
+        background: radial-gradient(circle at 30% 30%, var(--metal-light), var(--metal));
+        border: 3px solid #1a1a1a;
+        box-shadow: 
+            inset 0 2px 4px rgba(0,0,0,0.6),
+            inset 0 -2px 4px rgba(255,255,255,0.1),
+            0 4px 8px rgba(0,0,0,0.4);
+        transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        cursor: ns-resize;
+        user-select: none;
+        border-radius: 0.5rem;
+        width: 100%;
+        height: 5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+    
+    .rotor.disabled {
+        opacity: 0.3;
+        pointer-events: none;
+        filter: grayscale(1);
+    }
+    
+    .rotor.stepped {
+        animation: rotorStep 0.4s ease;
+        border-color: var(--brass);
+        box-shadow: 
+            inset 0 2px 4px rgba(0,0,0,0.6),
+            inset 0 -2px 4px rgba(255,255,255,0.1),
+            0 0 20px var(--brass);
+    }
+    
+    @keyframes rotorStep {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.08); }
+    }
+    
+    .double-step-indicator {
+        position: absolute;
+        top: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--brass);
+        color: #000;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: bold;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+        z-index: 20;
+    }
+    
+    .double-step-indicator.show {
+        opacity: 1;
+        animation: fadeInOut 1.5s ease;
+    }
+    
+    @keyframes fadeInOut {
+        0%, 100% { opacity: 0; transform: translateX(-50%) translateY(0); }
+        20%, 80% { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+    }
+    
+    .rotor-window {
+        background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 50%, #0a0a0a 100%);
+        border: 2px solid #000;
+        box-shadow: inset 0 2px 8px rgba(0,0,0,0.9);
+        border-radius: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .rotor .rotor-window {
+        width: 3.5rem;
+        height: 3.5rem;
+        border-radius: 50%;
+    }
+    
+    .lamp {
+        background: var(--lamp-off);
+        border: 2px solid #0a0a0a;
+        box-shadow: 
+            inset 0 2px 4px rgba(0,0,0,0.8),
+            0 1px 0 rgba(255,255,255,0.05);
+        transition: all 0.15s ease;
+        position: relative;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.875rem;
+    }
+    
+    .lamp.active {
+        background: radial-gradient(circle, var(--lamp-on) 0%, var(--lamp-glow) 100%);
+        box-shadow: 
+            0 0 20px var(--lamp-glow),
+            0 0 40px rgba(255, 165, 0, 0.5),
+            inset 0 0 10px rgba(255, 255, 255, 0.8);
+        color: #000;
+        font-weight: 700;
+        transform: scale(1.05);
+    }
+    
+    .key-button {
+        background: linear-gradient(145deg, var(--metal-light), var(--metal));
+        border: 2px solid #1a1a1a;
+        box-shadow: 
+            0 4px 0 #0a0a0a,
+            0 6px 10px rgba(0,0,0,0.6),
+            inset 0 1px 0 rgba(255,255,255,0.1);
+        transition: all 0.05s ease;
+        user-select: none;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.875rem;
+        cursor: pointer;
+    }
+    
+    .key-button:active, .key-button.active {
+        transform: translateY(2px);
+        box-shadow: 
+            0 2px 0 #0a0a0a,
+            0 3px 5px rgba(0,0,0,0.6),
+            inset 0 1px 0 rgba(255,255,255,0.1);
+        background: linear-gradient(145deg, var(--metal), var(--metal-light));
+    }
+    
+    .plug {
+        background: radial-gradient(circle at 30% 30%, #4a4a4a, #2a2a2a);
+        border: 2px solid #1a1a1a;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    .plug.connected {
+        background: radial-gradient(circle at 30% 30%, var(--brass), #8b7d2b);
+        box-shadow: 
+            0 0 10px rgba(181, 166, 66, 0.4),
+            inset 0 2px 4px rgba(0,0,0,0.4);
+    }
+    
+    .wire-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 10;
+    }
+    
+    .notch {
+        background: var(--brass);
+        box-shadow: 0 0 4px rgba(181, 166, 66, 0.6);
+        position: absolute;
+        top: 0;
+        width: 0.5rem;
+        height: 0.25rem;
+        border-radius: 0 0 0.25rem 0.25rem;
+    }
+    
+    .plate {
+        background: linear-gradient(145deg, #353a3f, #25282d);
+        border: 1px solid #1a1a1a;
+        box-shadow: 
+            inset 0 1px 0 rgba(255,255,255,0.05),
+            0 2px 4px rgba(0,0,0,0.5);
+        border-radius: 0.75rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .rotor-select, .reflector-select, .ring-select, .preset-select {
+        background: #1a1d20;
+        border: 1px solid #000;
+        color: #e0e0e0;
+        border-radius: 0.25rem;
+        padding: 0.25rem 0.5rem;
+        width: 100%;
+        text-align: center;
+        font-size: 0.75rem;
+    }
+    
+    .mode-badge {
+        background: linear-gradient(145deg, var(--brass), #8b7d2b);
+        color: #000;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        padding: 0.25rem 1rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: bold;
+        letter-spacing: 0.05em;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    
+    .processing {
+        animation: pulse 0.3s ease;
+    }
+    
+    .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: var(--metal-light);
+        color: var(--brass);
+        padding: 12px 24px;
+        border-radius: 8px;
+        border: 1px solid var(--brass);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+        z-index: 1000;
+        opacity: 0;
+        transform: translateY(20px);
+        transition: all 0.3s ease;
+    }
+    
+    .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    
+    .notepad-entry {
+        border-bottom: 1px solid #2a2d31;
+        padding: 8px 0;
+        font-size: 12px;
+    }
+    
+    .notepad-entry:last-child {
+        border-bottom: none;
+    }
+    
+    .preset-info {
+        font-size: 11px;
+        color: #888;
+        margin-top: 4px;
+    }
+    
+    .text-center { text-align: center; }
+    .mb-8 { margin-bottom: 2rem; }
+    .mb-6 { margin-bottom: 1.5rem; }
+    .mb-4 { margin-bottom: 1rem; }
+    .mb-2 { margin-bottom: 0.5rem; }
+    .mt-2 { margin-top: 0.5rem; }
+    .mt-3 { margin-top: 0.75rem; }
+    .gap-4 { gap: 1rem; }
+    .gap-3 { gap: 0.75rem; }
+    .gap-2 { gap: 0.5rem; }
+    .gap-1 { gap: 0.25rem; }
+    
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .flex-wrap { flex-wrap: wrap; }
+    .items-center { align-items: center; }
+    .justify-center { justify-content: center; }
+    .justify-between { justify-content: space-between; }
+    
+    .grid { display: grid; }
+    .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-cols-13 { grid-template-columns: repeat(13, 1fr); }
+    
+    .w-full { width: 100%; }
+    .h-14 { height: 3.5rem; }
+    .h-8 { height: 2rem; }
+    
+    .text-4xl { font-size: 2.25rem; }
+    .text-5xl { font-size: 3rem; }
+    .text-lg { font-size: 1.125rem; }
+    .text-sm { font-size: 0.875rem; }
+    .text-xs { font-size: 0.75rem; }
+    .text-xl { font-size: 1.25rem; }
+    .text-2xl { font-size: 1.5rem; }
+    
+    .font-bold { font-weight: 700; }
+    .font-semibold { font-weight: 600; }
+    .tracking-wider { letter-spacing: 0.05em; }
+    .tracking-widest { letter-spacing: 0.1em; }
+    .tracking-wide { letter-spacing: 0.025em; }
+    
+    .text-gray-300 { color: #d1d5db; }
+    .text-gray-400 { color: #9ca3af; }
+    .text-gray-500 { color: #6b7280; }
+    .text-gray-600 { color: #4b5563; }
+    .text-green-400 { color: #4ade80; }
+    .text-yellow-400 { color: #facc15; }
+    .text-yellow-500 { color: #eab308; }
+    
+    .bg-black { background: #000; }
+    .bg-blue-900 { background: #1e3a8a; }
+    .bg-blue-900:hover { background: #1e40af; }
+    .bg-red-900 { background: #7f1d1d; }
+    .bg-red-900:hover { background: #991b1b; }
+    .bg-green-900 { background: #14532d; }
+    .bg-green-900:hover { background: #166534; }
+    .bg-purple-900 { background: #581c87; }
+    .bg-purple-900:hover { background: #6b21a8; }
+    .bg-gray-700 { background: #374151; }
+    .bg-gray-700:hover { background: #4b5563; }
+    
+    .text-white { color: #fff; }
+    
+    .rounded { border-radius: 0.25rem; }
+    .rounded-lg { border-radius: 0.5rem; }
+    .rounded-xl { border-radius: 0.75rem; }
+    .rounded-full { border-radius: 9999px; }
+    
+    .px-4 { padding-left: 1rem; padding-right: 1rem; }
+    .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+    .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+    .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+    .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+    .px-1 { padding-left: 0.25rem; padding-right: 0.25rem; }
+    .p-4 { padding: 1rem; }
+    .p-6 { padding: 1.5rem; }
+    
+    .min-h-24 { min-height: 6rem; }
+    .break-all { word-break: break-all; }
+    .hidden { display: none; }
+    .block { display: block; }
+    .relative { position: relative; }
+    .absolute { position: absolute; }
+    
+    button {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    @media (min-width: 768px) {
+        body { padding: 2rem; }
+        .enigma-case { padding: 2.5rem; }
+        .text-4xl { font-size: 3rem; }
+        .lamp, .key-button, .plug { width: 3rem; height: 3rem; font-size: 1rem; }
+        .grid-cols-6 { grid-template-columns: repeat(6, 1fr); }
+    }
+    
+    @media (max-width: 767px) {
+        .grid-cols-2 { grid-template-columns: 1fr; }
+        .grid-cols-13 { grid-template-columns: repeat(7, 1fr); }
+    }
+</style>
+</head>
+<body>
+    <div class="enigma-case relative overflow-hidden">
+        <canvas id="wireCanvas" class="wire-canvas"></canvas>
+        
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="flex items-center justify-center gap-4 mb-2">
+                <h1 class="text-4xl font-bold tracking-wider" style="color: var(--brass); text-shadow: 0 2px 4px rgba(0,0,0,0.8);">
+                    ENIGMA
+                </h1>
+                <span id="modeBadge" class="mode-badge">M3</span>
+            </div>
+            <p class="text-sm text-gray-400 tracking-widest">WEHRMACHT & KRIEGSMARINE CRYPTOGRAPHIC DEVICE • 1930-1945</p>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="plate">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex flex-wrap items-center gap-3">
+                    <button id="modeToggle" class="px-4 py-2 bg-blue-900 text-white rounded-lg text-sm font-semibold">
+                        SWITCH TO M4
+                    </button>
+                    <button id="resetBtn" class="px-4 py-2 bg-red-900 text-white rounded-lg text-sm">
+                        RESET
+                    </button>
+                </div>
+                <div class="flex flex-wrap items-center gap-3" style="flex: 1; min-width: 300px;">
+                    <label class="text-xs text-gray-400">HISTORICAL PRESETS:</label>
+                    <select id="presetSelect" class="preset-select mono" style="flex: 1;">
+                        <option value="">-- Select Preset --</option>
+                        <option value="u96_1941">Day Key 1941-05-01 U-96</option>
+                        <option value="triton_1942">Triton July 1942</option>
+                        <option value="wehrmacht_1938">Wehrmacht 1938</option>
+                        <option value="d_day_1944">D-Day 1944-06-06</option>
+                        <option value="turing_bomb">Turing Bomb Test</option>
+                    </select>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button id="saveBtn" class="px-4 py-2 bg-green-900 text-white rounded-lg text-sm">
+                        SAVE
+                    </button>
+                    <button id="loadBtn" class="px-4 py-2 bg-purple-900 text-white rounded-lg text-sm">
+                        LOAD
+                    </button>
+                </div>
+            </div>
+            <div id="presetInfo" class="preset-info hidden"></div>
+        </div>
+
+        <!-- Rotors Section -->
+        <div class="plate">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold tracking-wide text-gray-300">ROTORS & REFLECTOR</h2>
+                <span id="rotorWarning" class="text-xs text-yellow-500 hidden">M4 Mode: Beta/Gamma in 4th slot only</span>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+                <!-- Reflector -->
+                <div class="flex flex-col items-center gap-2">
+                    <label class="text-xs text-gray-500">REFLECTOR</label>
+                    <select id="reflectorSelect" class="reflector-select mono">
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="B_THIN">B Thin</option>
+                        <option value="C_THIN">C Thin</option>
+                    </select>
+                    <div class="rotor-window w-full h-14">
+                        <span class="mono text-xl font-bold text-gray-600" id="reflectorDisplay">B</span>
+                    </div>
+                </div>
+                
+                <!-- 4th Rotor (M4 only) -->
+                <div class="flex flex-col items-center gap-2" data-rotor="3" id="rotor3Container">
+                    <div class="double-step-indicator">STEPPED</div>
+                    <select class="rotor-select mono">
+                        <option value="BETA" selected>Beta</option>
+                        <option value="GAMMA">Gamma</option>
+                    </select>
+                    <div class="rotor" data-position="0">
+                        <div class="rotor-window">
+                            <span class="mono text-2xl font-bold text-gray-300 rotor-letter">A</span>
+                        </div>
+                    </div>
+                    <select class="ring-select mono" title="Ring setting"></select>
+                    <div class="flex gap-1">
+                        <button class="rotor-up px-2 py-1 bg-gray-700 rounded text-xs">▲</button>
+                        <button class="rotor-down px-2 py-1 bg-gray-700 rounded text-xs">▼</button>
+                    </div>
+                    <label class="text-xs text-gray-500">4TH</label>
+                </div>
+
+                <!-- Left Rotor -->
+                <div class="flex flex-col items-center gap-2" data-rotor="2">
+                    <div class="double-step-indicator">DOUBLE STEP</div>
+                    <select class="rotor-select mono">
+                        <option value="I">I</option>
+                        <option value="II">II</option>
+                        <option value="III" selected>III</option>
+                        <option value="IV">IV</option>
+                        <option value="V">V</option>
+                        <option value="VI">VI</option>
+                        <option value="VII">VII</option>
+                        <option value="VIII">VIII</option>
+                    </select>
+                    <div class="rotor" data-position="0">
+                        <div class="rotor-window">
+                            <span class="mono text-2xl font-bold text-gray-300 rotor-letter">A</span>
+                        </div>
+                        <div class="notch"></div>
+                    </div>
+                    <select class="ring-select mono" title="Ring setting"></select>
+                    <div class="flex gap-1">
+                        <button class="rotor-up px-2 py-1 bg-gray-700 rounded text-xs">▲</button>
+                        <button class="rotor-down px-2 py-1 bg-gray-700 rounded text-xs">▼</button>
+                    </div>
+                    <label class="text-xs text-gray-500">LEFT</label>
+                </div>
+
+                <!-- Middle Rotor -->
+                <div class="flex flex-col items-center gap-2" data-rotor="1">
+                    <div class="double-step-indicator">DOUBLE STEP</div>
+                    <select class="rotor-select mono">
+                        <option value="I">I</option>
+                        <option value="II" selected>II</option>
+                        <option value="III">III</option>
+                        <option value="IV">IV</option>
+                        <option value="V">V</option>
+                        <option value="VI">VI</option>
+                        <option value="VII">VII</option>
+                        <option value="VIII">VIII</option>
+                    </select>
+                    <div class="rotor" data-position="0">
+                        <div class="rotor-window">
+                            <span class="mono text-2xl font-bold text-gray-300 rotor-letter">A</span>
+                        </div>
+                        <div class="notch"></div>
+                    </div>
+                    <select class="ring-select mono" title="Ring setting"></select>
+                    <div class="flex gap-1">
+                        <button class="rotor-up px-2 py-1 bg-gray-700 rounded text-xs">▲</button>
+                        <button class="rotor-down px-2 py-1 bg-gray-700 rounded text-xs">▼</button>
+                    </div>
+                    <label class="text-xs text-gray-500">MID</label>
+                </div>
+
+                <!-- Right Rotor -->
+                <div class="flex flex-col items-center gap-2" data-rotor="0">
+                    <div class="double-step-indicator">STEPPED</div>
+                    <select class="rotor-select mono">
+                        <option value="I" selected>I</option>
+                        <option value="II">II</option>
+                        <option value="III">III</option>
+                        <option value="IV">IV</option>
+                        <option value="V">V</option>
+                        <option value="VI">VI</option>
+                        <option value="VII">VII</option>
+                        <option value="VIII">VIII</option>
+                    </select>
+                    <div class="rotor" data-position="0">
+                        <div class="rotor-window">
+                            <span class="mono text-2xl font-bold text-gray-300 rotor-letter">A</span>
+                        </div>
+                        <div class="notch"></div>
+                    </div>
+                    <select class="ring-select mono" title="Ring setting"></select>
+                    <div class="flex gap-1">
+                        <button class="rotor-up px-2 py-1 bg-gray-700 rounded text-xs">▲</button>
+                        <button class="rotor-down px-2 py-1 bg-gray-700 rounded text-xs">▼</button>
+                    </div>
+                    <label class="text-xs text-gray-500">RIGHT</label>
+                </div>
+
+                <!-- Entry -->
+                <div class="flex flex-col items-center gap-2">
+                    <label class="text-xs text-gray-500">ENTRY</label>
+                    <div class="h-8"></div>
+                    <div class="rotor-window w-full h-14">
+                        <span class="mono text-xl font-bold text-gray-600">ETW</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lampboard -->
+        <div class="plate">
+            <h2 class="text-lg font-semibold tracking-wide text-gray-300 mb-4">LAMPBOARD</h2>
+            <div id="lampboard" style="display: flex; flex-direction: column; gap: 0.5rem; align-items: center;">
+            </div>
+        </div>
+
+        <!-- Keyboard -->
+        <div class="plate">
+            <h2 class="text-lg font-semibold tracking-wide text-gray-300 mb-4">KEYBOARD</h2>
+            <div class="flex flex-col gap-2 items-center" id="keyboard">
+            </div>
+        </div>
+
+        <!-- Plugboard -->
+        <div class="plate">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold tracking-wide text-gray-300">PLUGBOARD</h2>
+                <span class="text-xs text-gray-500 mono" id="plugCount">0/10 PAIRS</span>
+            </div>
+            <div class="grid grid-cols-13 gap-2" id="plugboard">
+            </div>
+            <p class="text-xs text-gray-500 mt-3">Click two letters to create a pair. Click a connected plug to remove.</p>
+        </div>
+
+        <!-- Output -->
+        <div class="plate">
+            <h2 class="text-lg font-semibold tracking-wide text-gray-300 mb-4">MESSAGE</h2>
+            <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+                <div>
+                    <label class="text-xs text-gray-500 block mb-2">INPUT</label>
+                    <div class="bg-black rounded-lg p-4 min-h-24 mono text-green-400 text-sm break-all" id="inputText"></div>
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 block mb-2">OUTPUT</label>
+                    <div class="bg-black rounded-lg p-4 min-h-24 mono text-yellow-400 text-sm break-all" id="outputText"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Message Notepad -->
+        <div class="plate">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold tracking-wide text-gray-300">MESSAGE LOG</h2>
+                <div class="flex gap-2">
+                    <button id="clearLogBtn" class="px-3 py-1 bg-gray-700 text-white rounded text-xs">
+                        CLEAR LOG
+                    </button>
+                    <button id="exportLogBtn" class="px-3 py-1 bg-blue-900 text-white rounded text-xs">
+                        EXPORT LOG
+                    </button>
+                </div>
+            <div class="bg-black rounded-lg p-4 mono text-xs" style="max-height: 300px; overflow-y: auto;" id="notepadContent">
+                <div class="text-gray-500">No messages yet. Type to begin encryption...</div>
+            </div>
+            <p class="text-xs text-gray-500 mt-3">Complete session log with timestamps. Export as TXT for analysis.</p>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+<script>
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+const ROTORS = {
+    'I':   { wiring: 'EKMFLGDQVZNTOWYHXUSPAIBRCJ', notch: 'Q', type: 'standard' },
+    'II':  { wiring: 'AJDKSIRUXBLHWTMCQGZNPYFVOE', notch: 'E', type: 'standard' },
+    'III': { wiring: 'BDFHJLCPRTXVZNYEIWGAKMUSQO', notch: 'V', type: 'standard' },
+    'IV':  { wiring: 'ESOVPZJAYQUIRHXLNFTGKDCMWB', notch: 'J', type: 'standard' },
+    'V':   { wiring: 'VZBRGITYUPSDNHLXAWMJQOFECK', notch: 'Z', type: 'standard' },
+    'VI':  { wiring: 'JPGVOUMFYQBENHZRDKASXLICTW', notch: 'ZM', type: 'standard' },
+    'VII': { wiring: 'NZJHGRCXMYSWBOUFAIVLPEKQDT', notch: 'ZM', type: 'standard' },
+    'VIII':{ wiring: 'FKQHTLXOCBJSPDZRAMEWNIUYGV', notch: 'ZM', type: 'standard' },
+    'BETA':{ wiring: 'LEYJVCNIXWPBQMDRTAKZFGUHOS', notch: '', type: 'static' },
+    'GAMMA':{wiring: 'FSOKANUERHMBTIYCWLQPZXVGJD', notch: '', type: 'static' }
+};
+
+const REFLECTORS = {
+    'B':     'YRUHQSLDPXNGOKMIEBFZCWVJAT',
+    'C':     'FVPJIAOYEDRZXWGCTKUQSBNMHL',
+    'B_THIN':'ENKQAUYWJICOPBLMDXZVFTHRGS',
+    'C_THIN':'RDOBJNTKVEHMLFCWZAXGYIPSUQ'
+};
+
+const ENTRY_WHEEL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+const PRESETS = {
+    'u96_1941': {
+        name: 'Day Key 1941-05-01 U-96',
+        description: 'M3 Wehrmacht - U-96 submarine Atlantic patrol',
+        isM4Mode: false,
+        reflector: 'B',
+        rotors: [
+            { type: 'I', position: 0, ring: 0 },
+            { type: 'II', position: 0, ring: 1 },
+            { type: 'III', position: 0, ring: 2 },
+        ],
+        plugboard: {
+            'A':'N','N':'A','E':'V','V':'E','B':'S','S':'B',
+            'C':'G','G':'C','D':'L','L':'D','F':'U','U':'F',
+            'H':'Z','Z':'H','I':'K','K':'I','M':'O','O':'M'
+        }
+    },
+    'triton_1942': {
+        name: 'Triton July 1942',
+        description: 'M4 Kriegsmarine - Atlantic Shark key net',
+        isM4Mode: true,
+        reflector: 'B_THIN',
+        rotors: [
+            { type: 'III', position: 0, ring: 10 },
+            { type: 'VI', position: 0, ring: 5 },
+            { type: 'I', position: 0, ring: 15 },
+            { type: 'BETA', position: 0, ring: 0 }
+        ],
+        plugboard: {
+            'A':'T','T':'A','B':'L','L':'B','C':'K','K':'C',
+            'D':'F','F':'D','E':'J','J':'E','G':'I','I':'G',
+            'H':'O','O':'H','M':'N','N':'M','P':'Q','Q':'P',
+            'R':'S','S':'R'
+        }
+    },
+    'wehrmacht_1938': {
+        name: 'Wehrmacht 1938',
+        description: 'M3 Wehrmacht - Standard field configuration',
+        isM4Mode: false,
+        reflector: 'B',
+        rotors: [
+            { type: 'III', position: 0, ring: 0 },
+            { type: 'II', position: 0, ring: 0 },
+            { type: 'I', position: 0, ring: 0 }
+        ],
+        plugboard: {
+            'A':'M','M':'A','F':'I','I':'F','N':'V','V':'N',
+            'P':'S','S':'P','T':'U','U':'T','W':'Z','Z':'W'
+        }
+    },
+    'd_day_1944': {
+        name: 'D-Day 1944-06-06',
+        description: 'M3 Wehrmacht - Normandy defense network',
+        isM4Mode: false,
+        reflector: 'C',
+        rotors: [
+            { type: 'V', position: 5, ring: 11 },
+            { type: 'VII', position: 0, ring: 0 },
+            { type: 'IV', position: 9, ring: 4 }
+        ],
+        plugboard: {
+            'B':'Q','Q':'B','C':'R','R':'C','D':'I','I':'D',
+            'E':'J','J':'E','K':'W','W':'K','M':'T','T':'M',
+            'O':'S','S':'O','P':'Y','Y':'P','U':'X','X':'U',
+            'Z':'G','G':'Z'
+        }
+    },
+    'turing_bomb': {
+        name: 'Turing Bomb Test',
+        description: 'Common test case - documented Turing decryption',
+        isM4Mode: false,
+        reflector: 'B',
+        rotors: [
+            { type: 'I', position: 12, ring: 7 },
+            { type: 'II', position: 10, ring: 11 },
+            { type: 'III', position: 7, ring: 24 }
+        ],
+        plugboard: {
+            'A':'V','V':'A','B':'S','S':'B','C':'G','G':'C',
+            'D':'L','L':'D','E':'N','N':'E','F':'U','U':'F',
+            'H':'Z','Z':'H','I':'T','T':'I','K':'X','X':'K',
+            'M':'W','W':'M'
+        }
+    }
+};
+
+class EnigmaMachine {
+    constructor() {
+        this.isM4Mode = false;
+        this.rotors = [
+            { type: 'I', position: 0, ring: 0 },
+            { type: 'II', position: 0, ring: 0 },
+            { type: 'III', position: 0, ring: 0 },
+            { type: 'BETA', position: 0, ring: 0 }
+        ];
+        this.reflector = 'B';
+        this.plugboard = {};
+        this.selectedPlug = null;
+        this.isProcessingKey = false;
+        this.activeKeys = new Set();
+        this.messageLog = [];
+        this.steppedRotors = [];
+        this.doubleStepOccurred = false;
+        this.animationFrameId = null;
+        
+        this.init();
+    }
+    
+    init() {
+        this.createRingSelectors();
+        this.createLampboard();
+        this.createKeyboard();
+        this.createPlugboard();
+        this.bindEvents();
+        this.updateMode();
+        this.updateDisplay();
+    }
+    
+    createRingSelectors() {
+        document.querySelectorAll('.ring-select').forEach(select => {
+            for (let i = 1; i <= 26; i++) {
+                const option = document.createElement('option');
+                option.value = i - 1;
+                option.textContent = `${String(i).padStart(2, '0')} ${ALPHABET[i-1]}`;
+                select.appendChild(option);
+            }
+        });
+    }
+    
+    createLampboard() {
+        const lampboard = document.getElementById('lampboard');
+        const rows = ['QWERTZUIO', 'ASDFGHJK', 'PYXCVBNML'];
+        
+        rows.forEach((row, rowIndex) => {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'flex gap-2';
+            if (rowIndex === 1) rowDiv.style.paddingLeft = '1rem';
+            if (rowIndex === 2) rowDiv.style.paddingLeft = '0.5rem';
+            
+            row.split('').forEach(letter => {
+                const lamp = document.createElement('div');
+                lamp.className = 'lamp mono';
+                lamp.textContent = letter;
+                lamp.dataset.letter = letter;
+                rowDiv.appendChild(lamp);
+            });
+            lampboard.appendChild(rowDiv);
+        });
+    }
+    
+    createKeyboard() {
+        const keyboard = document.getElementById('keyboard');
+        const rows = ['QWERTZUIO', 'ASDFGHJK', 'PYXCVBNML'];
+        
+        rows.forEach((row, rowIndex) => {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'flex gap-2';
+            if (rowIndex === 1) rowDiv.style.paddingLeft = '1.5rem';
+            if (rowIndex === 2) rowDiv.style.paddingLeft = '0.75rem';
+            
+            row.split('').forEach(letter => {
+                const key = document.createElement('button');
+                key.className = 'key-button mono';
+                key.textContent = letter;
+                key.dataset.letter = letter;
+                key.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    this.handleKeyPress(letter);
+                });
+                key.addEventListener('mouseup', () => this.handleKeyRelease(letter));
+                key.addEventListener('mouseleave', () => this.handleKeyRelease(letter));
+                key.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.handleKeyPress(letter);
+                });
+                key.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.handleKeyRelease(letter);
+                });
+                rowDiv.appendChild(key);
+            });
+            keyboard.appendChild(rowDiv);
+        });
+    }
+    
+    createPlugboard() {
+        const plugboard = document.getElementById('plugboard');
+        ALPHABET.split('').forEach(letter => {
+            const plug = document.createElement('button');
+            plug.className = 'plug mono';
+            plug.textContent = letter;
+            plug.dataset.letter = letter;
+            plug.addEventListener('click', () => this.handlePlugClick(letter));
+            plugboard.appendChild(plug);
+        });
+    }
+    
+    bindEvents() {
+        document.getElementById('modeToggle').addEventListener('click', () => this.toggleMode());
+        document.getElementById('presetSelect').addEventListener('change', (e) => this.loadPreset(e.target.value));
+        document.getElementById('reflectorSelect').addEventListener('change', (e) => {
+            this.reflector = e.target.value;
+            document.getElementById('reflectorDisplay').textContent = e.target.value.replace('_THIN', ' THIN');
+        });
+        
+        document.querySelectorAll('.rotor-select').forEach((select) => {
+            const rotorIdx = select.closest('[data-rotor]').dataset.rotor;
+            select.addEventListener('change', (e) => {
+                this.rotors[rotorIdx].type = e.target.value;
+                this.validateM4Config();
+            });
+        });
+        
+        document.querySelectorAll('.ring-select').forEach((select) => {
+            const rotorIdx = select.closest('[data-rotor]').dataset.rotor;
+            select.addEventListener('change', (e) => {
+                this.rotors[rotorIdx].ring = parseInt(e.target.value);
+            });
+        });
+        
+        document.querySelectorAll('.rotor-up').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const rotorDiv = e.target.closest('[data-rotor]');
+                const rotorIdx = parseInt(rotorDiv.dataset.rotor);
+                this.rotateRotor(rotorIdx, 1);
+            });
+        });
+        
+        document.querySelectorAll('.rotor-down').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const rotorDiv = e.target.closest('[data-rotor]');
+                const rotorIdx = parseInt(rotorDiv.dataset.rotor);
+                this.rotateRotor(rotorIdx, -1);
+            });
+        });
+        
+        document.addEventListener('keydown', (e) => {
+            const letter = e.key.toUpperCase();
+            if (ALPHABET.includes(letter) && !this.activeKeys.has(letter)) {
+                e.preventDefault();
+                this.activeKeys.add(letter);
+                this.handleKeyPress(letter);
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            const letter = e.key.toUpperCase();
+            if (ALPHABET.includes(letter)) {
+                this.activeKeys.delete(letter);
+                this.handleKeyRelease(letter);
+            }
+        });
+        
+        document.getElementById('resetBtn').addEventListener('click', () => this.reset());
+        document.getElementById('saveBtn').addEventListener('click', () => this.saveConfig());
+        document.getElementById('loadBtn').addEventListener('click', () => this.loadConfig());
+        document.getElementById('clearLogBtn').addEventListener('click', () => this.clearLog());
+        document.getElementById('exportLogBtn').addEventListener('click', () => this.exportLog());
+        
+        let draggingRotor = null;
+        let startY = 0;
+        let startPos = 0;
+        
+        document.querySelectorAll('.rotor').forEach((rotor) => {
+            rotor.addEventListener('mousedown', (e) => {
+                draggingRotor = parseInt(rotor.closest('[data-rotor]').dataset.rotor);
+                startY = e.clientY;
+                startPos = this.rotors[draggingRotor].position;
+                e.preventDefault();
+            });
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (draggingRotor !== null) {
+                const delta = Math.floor((startY - e.clientY) / 10);
+                this.rotors[draggingRotor].position = (startPos + delta + 26) % 26;
+                this.updateDisplay();
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            draggingRotor = null;
+        });
+    }
+    
+    toggleMode() {
+        this.isM4Mode = !this.isM4Mode;
+        this.updateMode();
+        this.showToast(this.isM4Mode ? 'Switched to M4 Mode (4-rotor)' : 'Switched to M3 Mode (3-rotor)');
+    }
+    
+    updateMode() {
+        const badge = document.getElementById('modeBadge');
+        const toggleBtn = document.getElementById('modeToggle');
+        const rotor3Container = document.getElementById('rotor3Container');
+        const warning = document.getElementById('rotorWarning');
+        
+        if (this.isM4Mode) {
+            badge.textContent = 'M4';
+            toggleBtn.textContent = 'SWITCH TO M3';
+            rotor3Container.style.display = 'flex';
+            warning.classList.remove('hidden');
+            document.getElementById('reflectorSelect').value = 'B_THIN';
+            this.reflector = 'B_THIN';
+            document.getElementById('reflectorDisplay').textContent = 'B THIN';
+        } else {
+            badge.textContent = 'M3';
+            toggleBtn.textContent = 'SWITCH TO M4';
+            rotor3Container.style.display = 'none';
+            warning.classList.add('hidden');
+            if (this.reflector.includes('THIN')) {
+                document.getElementById('reflectorSelect').value = 'B';
+                this.reflector = 'B';
+                document.getElementById('reflectorDisplay').textContent = 'B';
+            }
+        }
+        
+        this.validateM4Config();
+    }
+    
+    validateM4Config() {
+        if (!this.isM4Mode) return;
+        const rotor3Type = this.rotors[3].type;
+        const isValid = rotor3Type === 'BETA' || rotor3Type === 'GAMMA';
+        if (!isValid) {
+            this.showToast('M4 Mode: 4th rotor must be Beta or Gamma', 'warning');
+        }
+    }
+    
+    rotateRotor(index, direction) {
+        this.rotors[index].position = (this.rotors[index].position + direction + 26) % 26;
+        this.updateDisplay();
+    }
+    
+    handleKeyPress(letter) {
+        if (this.isProcessingKey) return;
+        this.isProcessingKey = true;
+        
+        const key = document.querySelector(`.key-button[data-letter="${letter}"]`);
+        if (key) key.classList.add('active');
+        
+        this.steppedRotors = [];
+        this.doubleStepOccurred = false;
+        this.stepRotors();
+        const encrypted = this.encrypt(letter);
+        
+        this.animateEncryption(letter, encrypted);
+        this.logMessage(letter, encrypted);
+        
+        document.getElementById('inputText').textContent += letter;
+        document.getElementById('outputText').textContent += encrypted;
+        
+        setTimeout(() => {
+            this.isProcessingKey = false;
+        }, 50);
+    }
+    
+    handleKeyRelease(letter) {
+        const key = document.querySelector(`.key-button[data-letter="${letter}"]`);
+        if (key) key.classList.remove('active');
+        
+        setTimeout(() => {
+            document.querySelectorAll('.lamp.active').forEach(lamp => {
+                lamp.classList.remove('active');
+            });
+        }, 100);
+    }
+    
+    stepRotors() {
+        const rotor0 = this.rotors[0];
+        const rotor1 = this.rotors[1];
+        const rotor2 = this.rotors[2];
+        
+        const getNotches = (rotor) => {
+            const notch = ROTORS[rotor.type].notch;
+            return notch.split('');
+        };
+        
+        const middleAtNotch = getNotches(this.rotors[1]).includes(ALPHABET[this.rotors[1].position]);
+        const rightAtNotch = getNotches(this.rotors[0]).includes(ALPHABET[this.rotors[0].position]);
+        
+        rotor0.position = (rotor0.position + 1) % 26;
+        this.steppedRotors.push(0);
+        
+        if (rightAtNotch) {
+            rotor1.position = (rotor1.position + 1) % 26;
+            this.steppedRotors.push(1);
+        }
+        
+        if (middleAtNotch) {
+            rotor1.position = (rotor1.position + 1) % 26;
+            if (!this.steppedRotors.includes(1)) this.steppedRotors.push(1);
+            rotor2.position = (rotor2.position + 1) % 26;
+            this.steppedRotors.push(2);
+            this.doubleStepOccurred = true;
+        }
+        
+        this.updateDisplay();
+        this.highlightSteppedRotors();
+    }
+    
+    highlightSteppedRotors() {
+        document.querySelectorAll('.rotor.stepped').forEach(r => r.classList.remove('stepped'));
+        document.querySelectorAll('.double-step-indicator').forEach(i => i.classList.remove('show'));
+        
+        this.steppedRotors.forEach(rotorIdx => {
+            const rotorEl = document.querySelector(`[data-rotor="${rotorIdx}"] .rotor`);
+            if (rotorEl) {
+                rotorEl.classList.add('stepped');
+                setTimeout(() => rotorEl.classList.remove('stepped'), 600);
+            }
+            
+            const indicator = document.querySelector(`[data-rotor="${rotorIdx}"] .double-step-indicator`);
+            if (indicator) {
+                if (rotorIdx === 1 && this.doubleStepOccurred) {
+                    indicator.textContent = 'DOUBLE STEP';
+                } else {
+                    indicator.textContent = 'STEPPED';
+                }
+                indicator.classList.add('show');
+                setTimeout(() => indicator.classList.remove('show'), 1500);
+            }
+        });
+    }
+    
+    encrypt(letter) {
+        let c = letter;
+        const numRotors = this.isM4Mode ? 4 : 3;
+        
+        c = this.plugboard[c] || c;
+        
+        for (let i = 0; i < numRotors; i++) {
+            c = this.rotorEncrypt(c, i, false);
+        }
+        
+        c = REFLECTORS[this.reflector][ALPHABET.indexOf(c)];
+        
+        for (let i = numRotors - 1; i >= 0; i--) {
+            c = this.rotorEncrypt(c, i, true);
+        }
+        
+        c = this.plugboard[c] || c;
+        return c;
+    }
+    
+    rotorEncrypt(letter, rotorIndex, reverse) {
+        const rotor = this.rotors[rotorIndex];
+        const wiring = ROTORS[rotor.type].wiring;
+        const position = rotor.position;
+        const ring = rotor.ring;
+        
+        let shift = (position - ring + 26) % 26;
+        let idx = (ALPHABET.indexOf(letter) + shift + 26) % 26;
+        
+        if (reverse) {
+            const wireLetter = ALPHABET[idx];
+            idx = wiring.indexOf(wireLetter);
+        } else {
+            idx = ALPHABET.indexOf(wiring[idx]);
+        }
+        
+        idx = (idx - shift + 26) % 26;
+        return ALPHABET[idx];
+    }
+    
+    animateEncryption(input, output) {
+        const lamp = document.querySelector(`.lamp[data-letter="${output}"]`);
+        if (lamp) {
+            lamp.classList.add('active');
+        }
+        this.drawCurrentFlow(input, output);
+    }
+    
+    drawCurrentFlow(input, output) {
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+        }
+        
+        const canvas = document.getElementById('wireCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        
+        const key = document.querySelector(`.key-button[data-letter="${input}"]`);
+        const lamp = document.querySelector(`.lamp[data-letter="${output}"]`);
+        
+        if (!key || !lamp) return;
+        
+        const keyRect = key.getBoundingClientRect();
+        const lampRect = lamp.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        const startX = keyRect.left + keyRect.width / 2 - canvasRect.left;
+        const startY = keyRect.top + keyRect.height / 2 - canvasRect.top;
+        const endX = lampRect.left + lampRect.width / 2 - canvasRect.left;
+        const endY = lampRect.top + lampRect.height / 2 - canvasRect.top;
+        
+        let progress = 0;
+        const animate = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (progress < 1) {
+                progress += 0.08;
+                const currentX = startX + (endX - startX) * progress;
+                const currentY = startY + (endY - startY) * progress;
+                
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(currentX, currentY);
+                ctx.strokeStyle = '#ffdd57';
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ffdd57';
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.arc(currentX, currentY, 5, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffdd57';
+                ctx.fill();
+                
+                this.animationFrameId = requestAnimationFrame(animate);
+            } else {
+                setTimeout(() => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    this.animationFrameId = null;
+                }, 200);
+            }
+        };
+        animate();
+    }
+    
+    handlePlugClick(letter) {
+        const plug = document.querySelector(`.plug[data-letter="${letter}"]`);
+        
+        if (this.plugboard[letter]) {
+            const paired = this.plugboard[letter];
+            delete this.plugboard[letter];
+            delete this.plugboard[paired];
+            document.querySelector(`.plug[data-letter="${paired}"]`).classList.remove('connected');
+            plug.classList.remove('connected');
+            this.selectedPlug = null;
+        } else if (this.selectedPlug === null) {
+            this.selectedPlug = letter;
+            plug.classList.add('connected');
+        } else if (this.selectedPlug === letter) {
+            this.selectedPlug = null;
+            plug.classList.remove('connected');
+        } else {
+            if (Object.keys(this.plugboard).length >= 20) {
+                this.showToast('Maximum 10 plugboard connections allowed', 'warning');
+                document.querySelector(`.plug[data-letter="${this.selectedPlug}"]`).classList.remove('connected');
+                this.selectedPlug = null;
+                return;
+            }
+            this.plugboard[this.selectedPlug] = letter;
+            this.plugboard[letter] = this.selectedPlug;
+            plug.classList.add('connected');
+            this.selectedPlug = null;
+        }
+        this.updatePlugCount();
+    }
+    
+    updatePlugCount() {
+        const count = Object.keys(this.plugboard).length / 2;
+        document.getElementById('plugCount').textContent = `${count}/10 PAIRS`;
+    }
+    
+    updateDisplay() {
+        document.querySelectorAll('[data-rotor]').forEach((rotorEl) => {
+            const rotorIdx = parseInt(rotorEl.dataset.rotor);
+            const position = this.rotors[rotorIdx].position;
+            const letter = ALPHABET[position];
+            rotorEl.querySelector('.rotor-letter').textContent = letter;
+            rotorEl.querySelector('.ring-select').value = this.rotors[rotorIdx].ring;
+        });
+    }
+    
+    loadPreset(presetKey) {
+        if (!presetKey || !PRESETS[presetKey]) {
+            document.getElementById('presetInfo').classList.add('hidden');
+            return;
+        }
+        
+        const preset = PRESETS[presetKey];
+        this.isM4Mode = preset.isM4Mode;
+        this.updateMode();
+        this.reflector = preset.reflector;
+        document.getElementById('reflectorSelect').value = this.reflector;
+        document.getElementById('reflectorDisplay').textContent = this.reflector.replace('_THIN', ' THIN');
+        this.rotors = preset.rotors.map(r => ({ ...r }));
+        
+        document.querySelectorAll('[data-rotor]').forEach((rotorEl) => {
+            const rotorIdx = parseInt(rotorEl.dataset.rotor);
+            if (this.rotors[rotorIdx]) {
+                rotorEl.querySelector('.rotor-select').value = this.rotors[rotorIdx].type;
+            }
+        });
+        
+        this.plugboard = { ...preset.plugboard };
+        document.querySelectorAll('.plug').forEach(p => p.classList.remove('connected'));
+        Object.keys(this.plugboard).forEach(letter => {
+            document.querySelector(`.plug[data-letter="${letter}"]`)?.classList.add('connected');
+        });
+        
+        this.updateDisplay();
+        this.updatePlugCount();
+        
+        const infoEl = document.getElementById('presetInfo');
+        infoEl.textContent = preset.description;
+        infoEl.classList.remove('hidden');
+        this.showToast(`Loaded preset: ${preset.name}`);
+    }
+    
+    logMessage(input, output) {
+        const timestamp = new Date().toLocaleTimeString();
+        this.messageLog.push({ timestamp, input, output });
+        
+        const notepad = document.getElementById('notepadContent');
+        if (this.messageLog.length === 1) {
+            notepad.innerHTML = '';
+        }
+        
+        const entry = document.createElement('div');
+        entry.className = 'notepad-entry';
+        entry.innerHTML = `<span class="text-gray-500">[${timestamp}]</span> <span class="text-green-400">IN: ${input}</span> → <span class="text-yellow-400">OUT: ${output}</span>`;
+        notepad.appendChild(entry);
+        notepad.scrollTop = notepad.scrollHeight;
+    }
+    
+    clearLog() {
+        this.messageLog = [];
+        document.getElementById('notepadContent').innerHTML = '<div class="text-gray-500">No messages yet. Type to begin encryption...</div>';
+        document.getElementById('inputText').textContent = '';
+        document.getElementById('outputText').textContent = '';
+        this.showToast('Message log cleared');
+    }
+    
+    exportLog() {
+        if (this.messageLog.length === 0) {
+            this.showToast('No messages to export', 'warning');
+            return;
+        }
+        
+        let content = 'ENIGMA MESSAGE LOG\n==================\n\n';
+        content += `Date: ${new Date().toLocaleDateString()}\n`;
+        content += `Mode: ${this.isM4Mode ? 'M4 (4-rotor)' : 'M3 (3-rotor)'}\n`;
+        content += `Reflector: ${this.reflector}\n`;
+        content += `Rotors: ${this.rotors.slice(0, this.isM4Mode ? 4 : 3).map((r) => `${r.type}(${ALPHABET[r.position]}/${r.ring + 1})`).reverse().join(' ')}\n`;
+        content += `Plugboard: ${Object.keys(this.plugboard).length > 0 ? Object.keys(this.plugboard).filter(k => k < this.plugboard[k]).map(k => k + this.plugboard[k]).join(' ') : 'None'}\n`;
+        content += '\n--- MESSAGES ---\n\n';
+        
+        let plaintext = '';
+        let ciphertext = '';
+        this.messageLog.forEach(entry => {
+            content += `[${entry.timestamp}] ${entry.input} → ${entry.output}\n`;
+            plaintext += entry.input;
+            ciphertext += entry.output;
+        });
+        
+        content += `\n\nPLAINTEXT:  ${plaintext}\n`;
+        content += `CIPHERTEXT: ${ciphertext}\n`;
+        
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `enigma_log_${new Date().toISOString().slice(0, 10)}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.showToast('Log exported successfully');
+    }
+    
+    saveConfig() {
+        const config = {
+            isM4Mode: this.isM4Mode,
+            reflector: this.reflector,
+            rotors: this.rotors.map(r => ({
+                type: r.type,
+                position: r.position,
+                ring: r.ring
+            })),
+            plugboard: this.plugboard
+        };
+        localStorage.setItem('enigmaConfig', JSON.stringify(config));
+        this.showToast('Configuration saved successfully');
+    }
+    
+    loadConfig() {
+        const saved = localStorage.getItem('enigmaConfig');
+        if (!saved) {
+            this.showToast('No saved configuration found', 'warning');
+            return;
+        }
+        
+        try {
+            const config = JSON.parse(saved);
+            this.isM4Mode = config.isM4Mode;
+            this.reflector = config.reflector;
+            this.rotors = config.rotors;
+            this.plugboard = config.plugboard;
+            
+            document.getElementById('reflectorSelect').value = this.reflector;
+            document.getElementById('reflectorDisplay').textContent = this.reflector.replace('_THIN', ' THIN');
+            
+            document.querySelectorAll('[data-rotor]').forEach((rotorEl) => {
+                const rotorIdx = parseInt(rotorEl.dataset.rotor);
+                if (this.rotors[rotorIdx]) {
+                    rotorEl.querySelector('.rotor-select').value = this.rotors[rotorIdx].type;
+                }
+            });
+            
+            document.querySelectorAll('.plug').forEach(p => p.classList.remove('connected'));
+            Object.keys(this.plugboard).forEach(letter => {
+                document.querySelector(`.plug[data-letter="${letter}"]`)?.classList.add('connected');
+            });
+            
+            this.updateMode();
+            this.updateDisplay();
+            this.updatePlugCount();
+            document.getElementById('presetSelect').value = '';
+            document.getElementById('presetInfo').classList.add('hidden');
+            this.showToast('Configuration loaded successfully');
+        } catch (e) {
+            this.showToast('Failed to load configuration', 'error');
+        }
+    }
+    
+    reset() {
+        this.rotors.forEach(r => {
+            r.position = 0;
+            r.ring = 0;
+        });
+        this.plugboard = {};
+        document.querySelectorAll('.plug').forEach(p => p.classList.remove('connected'));
+        document.getElementById('inputText').textContent = '';
+        document.getElementById('outputText').textContent = '';
+        document.getElementById('presetSelect').value = '';
+        document.getElementById('presetInfo').classList.add('hidden');
+        this.updateDisplay();
+        this.updatePlugCount();
+        this.showToast('Machine reset to defaults');
+    }
+    
+    showToast(message, type = 'success') {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast show';
+        
+        if (type === 'warning') {
+            toast.style.borderColor = '#f59e0b';
+            toast.style.color = '#f59e0b';
+        } else if (type === 'error') {
+            toast.style.borderColor = '#ef4444';
+            toast.style.color = '#ef4444';
+        } else {
+            toast.style.borderColor = 'var(--brass)';
+            toast.style.color = 'var(--brass)';
+        }
+        
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+}
+
+const enigma = new EnigmaMachine();
+</script>
+<script>(function(){document.addEventListener("click",function(e){var a=e.target.closest("[data-product-id]");if(!a)return;e.preventDefault();var pid=a.getAttribute("data-product-id");if(pid)parent.postMessage({type:"ecto-artifact-link-click",productId:pid},"*")})})();</script>
+</body>
+</html>
